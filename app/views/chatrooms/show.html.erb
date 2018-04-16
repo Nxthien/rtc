@@ -1,20 +1,50 @@
-<p>
-  <strong>Name:</strong>
-  <%= @chatroom.name %>
-</p>
+<div class="container">
+  <h1 class="title" style="text-align: center">
+    <strong>Name:</strong>
+    <%= @chatroom.name %>
+  </h1>
+  <div class="row">
+    <div class="col-xs-8">
+      <h3>Video Group</h3>
+      <div class="highlight">
+        <p>New codelab: <a href="https://codelabs.developers.google.com/codelabs/webrtc-web">Realtime communication with WebRTC</a></p>
+      </div>
 
-<% unread_messages = false %>
-<div data-behavior='messages' data-chatroom-id='<%= @chatroom.id %>'>
-  <% @messages.each do |message| %>
-    <% if !unread_messages && @chatroom_user.last_read_at < message.created_at %>
-      <% unread_messages = true %>
-      <div class="strike"><span>Unread Messages</span></div>
-    <% end %>
+      <h1><a href="//webrtc.github.io/samples/" title="WebRTC samples homepage">WebRTC samples</a> <span>Peer connection</span></h1>
+      <input type="hidden" value="<%= @chatroom.id %>" id='room-id'>
+      <input type="hidden" value="<%= @chatroom.name %>" id='room-name'>
+      <div>
+        <video id="local-video" autoplay muted></video>
+      </div>
+      <div id="remote-video-container"></div>
+      <div>
+        <button id="callButton" onclick="window.handleJoinSession()">Call</button>
+        <button id="hangupButton" onclick="window.handleLeaveSession()">Hang Up</button>
+      </div>
 
-    <%= render message %>
-  <% end %>
+      <p>View the console to see logging. The <code>MediaStream</code> object <code>localStream</code>, and the <code>RTCPeerConnection</code> objects <code>pc1</code> and <code>pc2</code> are in global scope, so you can inspect them in the console as well.</p>
+
+      <p>For more information about RTCPeerConnection, see <a href="http://www.html5rocks.com/en/tutorials/webrtc/basics/" title="HTML5 Rocks article about WebRTC by Sam Dutton">Getting Started With WebRTC</a>.</p>
+
+
+      <a href="https://github.com/webrtc/samples/tree/gh-pages/src/content/peerconnection/pc1" title="View source for this page on GitHub" id="viewSource">View source on GitHub</a>
+    </div>
+    <div class="col-xs-4 messages">
+      <% unread_messages = false %>
+      <div data-behavior='messages' data-chatroom-id='<%= @chatroom.id %>'>
+        <% @messages.each do |message| %>
+          <% if !unread_messages && @chatroom_user.last_read_at < message.created_at %>
+            <% unread_messages = true %>
+            <div class="strike"><span>Unread Messages</span></div>
+          <% end %>
+
+          <%= render message %>
+        <% end %>
+      </div>
+
+      <%= form_for [@chatroom, Message.new] do |f| %>
+        <%= f.text_area :body, rows: 1, class: "form-control", autofocus: true %>
+      <% end %>  
+    </div>
+  </div>
 </div>
-
-<%= form_for [@chatroom, Message.new] do |f| %>
-  <%= f.text_area :body, rows: 1, class: "form-control", autofocus: true %>
-<% end %>
