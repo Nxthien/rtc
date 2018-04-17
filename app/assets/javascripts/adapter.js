@@ -2898,7 +2898,6 @@ module.exports = {
     window.RTCPeerConnection.prototype.addStream = function(stream) {
       var pc = this;
       this._shimmedLocalStreams = this._shimmedLocalStreams || {};
-
       stream.getTracks().forEach(function(track) {
         var alreadyExists = pc.getSenders().find(function(s) {
           return s.track === track;

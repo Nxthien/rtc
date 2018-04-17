@@ -6,22 +6,22 @@ $(document).on("turbolinks:load", function(){
   const REMOVE_USER = "REMOVE_USER";
 
   // DOM Elements
-  let currentRoom;
+  let currentUser;
   let localVideo;
   let remoteVideoContainer;
   // Objects
   let pcPeers = {};
-  let localstream;
+  let localStream = {};
   let callButton = document.getElementById("callButton")
   let hangoutButton = document.getElementById("hangoutButton")
 
   let startButton = document.getElementById("startButton") 
-  currentRoom = document.getElementById("room-name").value;
+  currentUser = document.getElementById("currentUser").value;
   localVideo = document.getElementById("local-video");
   remoteVideoContainer = document.getElementById("remote-video-container");
   let roomId = document.getElementById("room-id").value
   // Ice Credentials
-  if (currentRoom && roomId && localVideo && remoteVideoContainer) {
+  if (currentUser && roomId && localVideo && remoteVideoContainer) {
     const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
     // Initialize user's own video
@@ -37,7 +37,7 @@ $(document).on("turbolinks:load", function(){
     //   .catch(logError);
     function gotStream(stream) {
       localVideo.srcObject = stream;
-      window.localStream = stream;
+      localStream = stream;
     }
 
     let start = () => {
@@ -55,20 +55,23 @@ $(document).on("turbolinks:load", function(){
       start()
     }
 
-    window.handleJoinSession = async () => {
+    window.handleJoinSession = () => {
       roomId = document.getElementById("room-id").value
-      App.call = await App.cable.subscriptions.create("CallChannel", {
+      App.call = App.cable.subscriptions.create(
+        {
+          channel: "CallChannel",
+          roomId: roomId
+        }, {
         connected: () => {
-          debugger
           broadcastData({
             room_id: roomId,
             type: JOIN_ROOM,
-            from: currentRoom
+            from: currentUser
           });
         },
         received: data => {
-          debugger
           console.log("received", data);
+          callButton.disabled = true
           if (data.from === currentUser) return;
           switch (data.type) {
             case JOIN_ROOM:
@@ -86,6 +89,7 @@ $(document).on("turbolinks:load", function(){
     };
 
     window.handleLeaveSession = () => {
+      roomId = document.getElementById("room-id").value
       for (user in pcPeers) {
         pcPeers[user].close();
       }
@@ -97,12 +101,13 @@ $(document).on("turbolinks:load", function(){
 
       broadcastData({
         type: REMOVE_USER,
-        from: currentRoom
+        from: currentUser,
+        room_id: roomId
       });
     };
 
     const joinRoom = data => {
-      createPC(data.from, true);
+      let pc = createPC(data.from, true);
     };
 
     const removeUser = data => {
@@ -113,34 +118,35 @@ $(document).on("turbolinks:load", function(){
     };
 
     const createPC = (userId, isOffer) => {
+      roomId = document.getElementById("room-id").value
       let pc = new RTCPeerConnection(ice);
       pcPeers[userId] = pc;
-      pc.addStream(localstream);
-
+      pc.addStream(localStream);
       isOffer &&
         pc
-          .createOffer()
+          .createOffer({offerToReceiveAudio: 1,
+                offerToReceiveVideo: 1})
           .then(offer => {
             pc.setLocalDescription(offer);
             broadcastData({
               type: EXCHANGE,
-              from: currentRoom,
+              from: currentUser,
               to: userId,
-              sdp: JSON.stringify(pc.localDescription)
+              sdp: JSON.stringify(pc.localDescription),
+              room_id: roomId
             });
           })
           .catch(logError);
-
       pc.onicecandidate = event => {
         event.candidate &&
           broadcastData({
             type: EXCHANGE,
-            from: currentRoom,
+            from: currentUser,
             to: userId,
-            candidate: JSON.stringify(event.candidate)
+            candidate: JSON.stringify(event.candidate),
+            room_id: roomId
           });
       };
-
       pc.onaddstream = event => {
         const element = document.createElement("video");
         element.id = `remoteVideoContainer+${userId}`;
@@ -148,13 +154,15 @@ $(document).on("turbolinks:load", function(){
         element.srcObject = event.stream;
         remoteVideoContainer.appendChild(element);
       };
+      
 
       pc.oniceconnectionstatechange = event => {
         if (pc.iceConnectionState == "disconnected") {
           console.log("Disconnected:", userId);
           broadcastData({
             type: REMOVE_USER,
-            from: userId
+            from: userId,
+            room_id: roomId
           });
         }
       };
@@ -163,8 +171,9 @@ $(document).on("turbolinks:load", function(){
     };
 
     const exchange = data => {
+      roomId = document.getElementById("room-id").value
       let pc;
-
+      let sdp;
       if (!pcPeers[data.from]) {
         pc = createPC(data.from, false);
       } else {
@@ -177,7 +186,6 @@ $(document).on("turbolinks:load", function(){
           .then(() => console.log("Ice candidate added"))
           .catch(logError);
       }
-
       if (data.sdp) {
         sdp = JSON.parse(data.sdp);
         pc
@@ -188,9 +196,10 @@ $(document).on("turbolinks:load", function(){
                 pc.setLocalDescription(answer);
                 broadcastData({
                   type: EXCHANGE,
-                  from: currentRoom,
+                  from: currentUser,
                   to: data.from,
-                  sdp: JSON.stringify(pc.localDescription)
+                  sdp: JSON.stringify(pc.localDescription),
+                  room_id: roomId
                 });
               });
             }
@@ -208,7 +217,6 @@ $(document).on("turbolinks:load", function(){
         }
       });
     };
-
     const logError = error => console.warn("Whoops! Error:", error);
   }
 })
